@@ -96,11 +96,6 @@ which python3                # copy this full path — you'll need it in REAPER,
 | `Browse_corpus.lua` | Live CataRT-style instrument: XY plot, prelisten, trigger modes, record-to-timeline |
 | `Create_corpus.lua` | GUI to run analysis + clustering from inside REAPER, in the background |
 
-|---|---|
-| `navigate_descriptor_space_ui.lua` | Generates a sequence by walking a path through two descriptors |
-| `match_target.py` | Finds nearest corpus fragments for each segment of a target sound → `matches.csv` |
-| `place_matches.lua` | Places `matches.csv` results on the timeline |
-| `generate_chain.lua` | Free generation: random or similarity-walk chain from the corpus |
 
 Pipeline outputs (CSV/JSON) default to a `corpus_data/` subfolder next to the scripts.
 `Browse_corpus.lua` shows an in-window picker listing any CSVs found there.
