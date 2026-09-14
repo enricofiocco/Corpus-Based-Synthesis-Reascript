@@ -93,11 +93,11 @@ which python3                # copy this full path — you'll need it in REAPER,
 | `analyze_corpus.py` | Segments a folder of audio and extracts descriptors → `corpus.csv` |
 | `add_to_corpus.py` | Adds new audio to an existing `corpus.csv`, skipping already-analyzed files |
 | `cluster_corpus.py` | Normalizes features and k-means clusters by timbre → `corpus_clustered.csv` + scaler |
-
-| `navigate_descriptor_space_ui.lua` | Generates a sequence by walking a path through two descriptors |
 | `Browse_corpus.lua` | Live CataRT-style instrument: XY plot, prelisten, trigger modes, record-to-timeline |
 | `Create_corpus.lua` | GUI to run analysis + clustering from inside REAPER, in the background |
 
+|---|---|
+| `navigate_descriptor_space_ui.lua` | Generates a sequence by walking a path through two descriptors |
 | `match_target.py` | Finds nearest corpus fragments for each segment of a target sound → `matches.csv` |
 | `place_matches.lua` | Places `matches.csv` results on the timeline |
 | `generate_chain.lua` | Free generation: random or similarity-walk chain from the corpus |
