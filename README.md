@@ -1,4 +1,4 @@
-# Corpus-based Synthesis Engine for REAPER
+# Concatenative Synthesis Engine for REAPER
 
 Corpus-based / concatenative synthesis for REAPER (ReaScript/Lua) + Python. Analyzes a folder of
 audio, segments and describes every fragment (spectral, dynamic, timbral, pitch), clusters it by
@@ -92,10 +92,15 @@ which python3                # copy this full path — you'll need it in REAPER,
 |---|---|
 | `analyze_corpus.py` | Segments a folder of audio and extracts descriptors → `corpus.csv` |
 | `add_to_corpus.py` | Adds new audio to an existing `corpus.csv`, skipping already-analyzed files |
+| `analyze_item.py` | Measures one audio segment with the corpus descriptors (used by `Find_similar.lua`) |
 | `cluster_corpus.py` | Normalizes features and k-means clusters by timbre → `corpus_clustered.csv` + scaler |
+| `match_target.py` | Finds nearest corpus fragments for each segment of a target sound → `matches.csv` |
+| `place_matches.lua` | Places `matches.csv` results on the timeline |
+| `generate_chain.lua` | Free generation: random or similarity-walk chain from the corpus |
+| `navigate_descriptor_space_ui.lua` | Generates a sequence by walking a path through two descriptors |
 | `Browse_corpus.lua` | Live CataRT-style instrument: XY plot, prelisten, trigger modes, record-to-timeline |
+| `Find_similar.lua` | Select one item → find close sounds in a corpus (centroid, spread, level… + radius), prelisten, insert |
 | `Create_corpus.lua` | GUI to run analysis + clustering from inside REAPER, in the background |
-
 
 Pipeline outputs (CSV/JSON) default to a `corpus_data/` subfolder next to the scripts.
 `Browse_corpus.lua` shows an in-window picker listing any CSVs found there.
@@ -104,6 +109,7 @@ Pipeline outputs (CSV/JSON) default to a `corpus_data/` subfolder next to the sc
 
 1. Run `Create_corpus.lua` → pick your audio folder → **RUN PIPELINE**.
 2. Run `Browse_corpus.lua` → pick a corpus → move the mouse to prelisten, click to place, toggle **Record** to capture a performance to the timeline.
+3. Or select **one item** in REAPER and run `Find_similar.lua`: it analyzes the item, lists corpus fragments within the chosen **radius** by your weighted criteria; click to prelisten, Enter / double-click to insert (next to the item, replacing it, or at the edit cursor).
 3. For target-driven resynthesis: run `match_target.py` against a target file, then `place_matches.lua`.
 
 ## Troubleshooting
@@ -134,4 +140,4 @@ Install js_ReaScriptAPI (optional, see above), or use the built-in fallback: pic
 
 ## License
 
-MIT License
+Add your preferred license here (MIT recommended).

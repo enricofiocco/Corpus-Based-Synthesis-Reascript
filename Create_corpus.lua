@@ -87,21 +87,32 @@ local function tmp_path(suffix)
   return string.format("/tmp/reascript_corpus_pipeline_%d_%d%s", math.floor(reaper.time_precise() * 1000), tmp_counter, suffix)
 end
 
-local function start_background_job(cmd, label, on_complete)
+local function start_background_job(cmd, label, on_complete, progress_fn)
   local log_path = tmp_path(".log")
   local status_path = tmp_path(".status")
   local done_path = tmp_path(".done")
-  local bg_cmd = string.format('( %s > "%s" 2>&1 ; echo $? > "%s" ; touch "%s" ) &', cmd, log_path, status_path, done_path)
+  -- PYTHONUNBUFFERED so the log file fills up live (progress bar reads it)
+  local bg_cmd = string.format('( PYTHONUNBUFFERED=1 %s > "%s" 2>&1 ; echo $? > "%s" ; touch "%s" ) &', cmd, log_path, status_path, done_path)
   os.execute(bg_cmd)
   job = {
     log_path = log_path, status_path = status_path, done_path = done_path,
     on_complete = on_complete, label = label, start_time = reaper.time_precise(),
+    progress_fn = progress_fn, progress = 0, detail = "", last_poll = 0,
   }
 end
 
 -- called every frame from the main loop; returns nothing, may advance/clear `job`
 local function poll_job()
   if not job then return end
+  if job.progress_fn and not file_exists(job.done_path) then
+    local now = reaper.time_precise()
+    if now - job.last_poll > 0.4 then
+      job.last_poll = now
+      local frac, detail = job.progress_fn(read_file(job.log_path))
+      if frac then job.progress = math.max(0, math.min(1, frac)) end
+      if detail then job.detail = detail end
+    end
+  end
   if file_exists(job.done_path) then
     local log_text = read_file(job.log_path)
     local exit_code = tonumber(read_file(job.status_path)) or 1
@@ -206,6 +217,40 @@ local function label(x, y, text)
   gfx.drawstr(text)
 end
 
+-- Progress parsing: the Python scripts print "[i/N] file" per audio file
+-- (analysis) and "k=.. silhouette=.." lines (auto-k scan). The log is read
+-- while the job runs and turned into a 0..1 fraction for the progress bar.
+local function analysis_progress(log)
+  local total = tonumber(log:match("Analyzing (%d+) new file"))
+  if not total then
+    if log:find("No new files", 1, true) then return 1, "Nothing new to analyze" end
+    return 0, "Starting analysis..."
+  end
+  local cur
+  for i in log:gmatch("%[(%d+)/%d+%]") do cur = tonumber(i) end
+  cur = cur or 0
+  return math.max(cur - 1, 0) / total, string.format("Analyzing file %d / %d", cur, total)
+end
+
+local function cluster_progress(log)
+  local a, b = log:match("Scanning k=(%d+)%.%.(%d+)")
+  local detail, frac = "Clustering...", 0.05
+  if a and b then
+    local n = 0
+    for _ in log:gmatch("\n%s+k=%s*%d+%s+silhouette") do n = n + 1 end
+    local span = math.max(tonumber(b) - tonumber(a) + 1, 1)
+    frac = 0.05 + 0.8 * math.min(n / span, 1)
+    detail = string.format("Scanning k (%d / %d)", n, span)
+  end
+  if log:find("Best k", 1, true) then frac, detail = 0.9, "Running k-means..." end
+  if log:find("Running k-means", 1, true) then frac, detail = 0.9, "Running k-means..." end
+  if log:find("Cluster sizes", 1, true) then frac, detail = 0.97, "Saving..." end
+  return frac, detail
+end
+
+-- overall bar = base + span * (current step progress)
+local stage = { base = 0, span = 1, name = "Step 1/1: analysis" }
+
 local MARGIN = 24
 local ROW_W = BASE_W - MARGIN * 2
 
@@ -283,7 +328,14 @@ local function draw()
 
   y = y + 10
   if busy then
-    draw_button(x, y, ROW_W, 46, "Working...", true, false)
+    local frac = stage.base + stage.span * (job.progress or 0)
+    gfx.set(0.22, 0.22, 0.22, 1); grect(x, y, ROW_W, 46, 1)
+    gfx.set(0.3, 0.7, 1.0, 1); grect(x, y, ROW_W * math.max(0, math.min(frac, 1)), 46, 1)
+    gfx.set(1, 1, 1, 1)
+    gset_xy(x + 10, y + 5)
+    gfx.drawstr(string.format("%s  -  %d%%", stage.name, math.floor(frac * 100 + 0.5)))
+    gset_xy(x + 10, y + 25)
+    gfx.drawstr(job.detail or "")
   else
     draw_button(x, y, ROW_W, 46, "RUN PIPELINE", false, false).action = "run"
   end
@@ -298,6 +350,7 @@ end
 -- Run pipeline (non-blocking)
 -- ---------------------------------------------------------------------
 local function run_step2_clustering()
+  stage.base, stage.span, stage.name = 0.85, 0.15, "Step 2/2: clustering"
   local cluster_cmd = string.format(
     '"%s" "%s" "%s" --out "%s" --scaler-out "%s"',
     F.python_exe, F.cluster_script, F.out_csv, F.clustered_csv, F.scaler_json
@@ -318,7 +371,7 @@ local function run_step2_clustering()
     end
     reaper.ShowMessageBox("Done!\n\nCorpus CSV:\n" .. F.out_csv .. "\n\nClustered CSV:\n" .. F.clustered_csv .. "\n\nScaler:\n" .. F.scaler_json, "Pipeline complete", 0)
     quit_requested = true
-  end)
+  end, cluster_progress)
 end
 
 local function do_run()
@@ -356,6 +409,11 @@ local function do_run()
   if F.overwrite_corpus then
     analyze_cmd = analyze_cmd .. " --overwrite"
   end
+  if F.do_cluster then
+    stage.base, stage.span, stage.name = 0, 0.85, "Step 1/2: analysis"
+  else
+    stage.base, stage.span, stage.name = 0, 1, "Analysis"
+  end
   start_background_job(analyze_cmd, "Step 1: analyze_corpus.py", function(success, log_text)
     if not success or not file_exists(F.out_csv) then
       reaper.ShowMessageBox("analyze_corpus.py failed or did not produce the expected CSV.\n\nOutput:\n" .. log_text:sub(1, 1500), "Analysis failed", 0)
@@ -367,7 +425,7 @@ local function do_run()
       reaper.ShowMessageBox("Done!\n\nCorpus CSV:\n" .. F.out_csv, "Analysis complete", 0)
       quit_requested = true
     end
-  end)
+  end, analysis_progress)
 end
 
 -- ---------------------------------------------------------------------
