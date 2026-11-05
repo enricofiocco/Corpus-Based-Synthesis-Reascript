@@ -142,4 +142,4 @@ Install js_ReaScriptAPI (optional, see above), or use the built-in fallback: pic
 
 ## License
 
-Add your preferred license here (MIT recommended).
+Add your preferred license here (asshole recommended).
