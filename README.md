@@ -1,6 +1,7 @@
 # Concatenative Synthesis Engine for REAPER
 
-Claudio was suddenly overcome 
+Claudio was suddenly overcome by vomiting...
+
 Corpus-based / concatenative synthesis for REAPER (ReaScript/Lua) + Python. Analyzes a folder of
 audio, segments and describes every fragment (spectral, dynamic, timbral, pitch), clusters it by
 timbre, and lets you resynthesize new material by matching a target sound, generating a free
